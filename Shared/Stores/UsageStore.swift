@@ -21,8 +21,11 @@ final class UsageStore: ObservableObject {
     @Published var planType: PlanType = .unknown
     @Published var rateLimitTier: String?
     @Published var organizationName: String?
+    @Published private(set) var lastUsage: UsageResponse?
 
     var hasError: Bool { errorState != .none }
+
+    var pacingMargin: Int = 10
 
     /// Token that last received a 401/403. Prevents retrying the API with a known-dead token.
     private var lastFailedToken: String?
@@ -41,7 +44,15 @@ final class UsageStore: ObservableObject {
         self.notificationService = notificationService
     }
 
-    func refresh(thresholds: UsageThresholds = .default) async {
+    func refresh(thresholds: UsageThresholds = .default, force: Bool = false) async {
+        // Prevent concurrent refreshes — multiple .task/.onAppear can race
+        guard !isLoading else { return }
+
+        // Throttle: skip if a successful refresh happened less than 20s ago (avoids 429)
+        if !force, let last = lastUpdate, Date().timeIntervalSince(last) < 20 {
+            return
+        }
+
         // Silent keychain read — try to recover token if not configured
         // or if the current one already failed (auto-recovery from Claude Code refresh).
         if !repository.isConfigured || lastFailedToken == repository.currentToken {
@@ -81,6 +92,9 @@ final class UsageStore: ObservableObject {
                 errorState = .tokenExpired
             case .keychainLocked:
                 errorState = .keychainLocked
+            case .httpError(429):
+                // Rate limited — silently skip, auto-refresh will retry later
+                break
             default:
                 errorState = .networkError(error.localizedDescription)
             }
@@ -106,13 +120,19 @@ final class UsageStore: ObservableObject {
         notificationService.requestPermission()
         WidgetReloader.scheduleReload()
         refreshTask?.cancel()
-        refreshTask = Task { await refresh(thresholds: thresholds) }
-        Task { await refreshProfile() }
+        // Sequential: refresh first, then profile after a delay to avoid 429
+        refreshTask = Task {
+            await refresh(thresholds: thresholds)
+            try? await Task.sleep(for: .seconds(2))
+            await refreshProfile()
+        }
     }
 
     func startAutoRefresh(interval: TimeInterval = 30, thresholds: UsageThresholds = .default) {
         refreshTask?.cancel()
         refreshTask = Task { [weak self] in
+            // Wait first — reloadConfig already triggers an initial refresh
+            try? await Task.sleep(for: .seconds(interval))
             while !Task.isCancelled {
                 guard let self else { return }
                 await self.refresh(thresholds: thresholds)
@@ -138,13 +158,18 @@ final class UsageStore: ObservableObject {
         return result
     }
 
+    private var lastProfileFetch: Date?
+
     func refreshProfile() async {
         guard repository.isConfigured else { return }
+        // Throttle: profile rarely changes, skip if fetched less than 60s ago
+        if let last = lastProfileFetch, Date().timeIntervalSince(last) < 60 { return }
         do {
             let profile = try await repository.fetchProfile(proxyConfig: proxyConfig)
             planType = PlanType(from: profile.account, organization: profile.organization)
             rateLimitTier = profile.organization?.rateLimitTier
             organizationName = profile.organization?.name
+            lastProfileFetch = Date()
         } catch {
             // Profile fetch failure is non-critical — don't update errorState
         }
@@ -153,6 +178,7 @@ final class UsageStore: ObservableObject {
     // MARK: - Private
 
     private func update(from usage: UsageResponse) {
+        lastUsage = usage
         fiveHourPct = Int(usage.fiveHour?.utilization ?? 0)
         sevenDayPct = Int(usage.sevenDay?.utilization ?? 0)
         sonnetPct = Int(usage.sevenDaySonnet?.utilization ?? 0)
@@ -175,7 +201,16 @@ final class UsageStore: ObservableObject {
             fiveHourReset = ""
         }
 
-        if let pacing = PacingCalculator.calculate(from: usage) {
+        if let pacing = PacingCalculator.calculate(from: usage, margin: Double(pacingMargin)) {
+            pacingDelta = Int(pacing.delta)
+            pacingZone = pacing.zone
+            pacingResult = pacing
+        }
+    }
+
+    func recalculatePacing() {
+        guard let usage = lastUsage else { return }
+        if let pacing = PacingCalculator.calculate(from: usage, margin: Double(pacingMargin)) {
             pacingDelta = Int(pacing.delta)
             pacingZone = pacing.zone
             pacingResult = pacing

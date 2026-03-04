@@ -5,6 +5,7 @@ struct MainAppView: View {
     @EnvironmentObject private var themeStore: ThemeStore
     @EnvironmentObject private var settingsStore: SettingsStore
     @EnvironmentObject private var updateStore: UpdateStore
+    @EnvironmentObject private var sessionStore: SessionStore
 
     @State private var selectedSection: AppSection = .dashboard
 
@@ -29,9 +30,17 @@ struct MainAppView: View {
                 case .dashboard:
                     DashboardView()
                 case .display:
-                    DisplaySectionView()
+                    DisplaySectionView(initialMetrics: settingsStore.pinnedMetrics)
                 case .themes:
-                    ThemesSectionView()
+                    ThemesSectionView(
+                        initialWarning: themeStore.warningThreshold,
+                        initialCritical: themeStore.criticalThreshold,
+                        initialMargin: settingsStore.pacingMargin
+                    )
+                case .agentWatchers:
+                    AgentWatchersSectionView()
+                case .performance:
+                    PerformanceSectionView()
                 case .settings:
                     SettingsSectionView()
                 }
@@ -42,7 +51,7 @@ struct MainAppView: View {
         }
         .padding(4)
         .task {
-            // Single refresh on appear — auto-refresh lifecycle is owned by StatusBarController
+            // Refresh on appear — throttled by UsageStore (10s debounce)
             await usageStore.refresh(thresholds: themeStore.thresholds)
         }
         .onReceive(NotificationCenter.default.publisher(for: .navigateToSection)) { notification in
@@ -64,6 +73,6 @@ struct MainAppView: View {
             .background(RoundedRectangle(cornerRadius: 16).fill(panelBg))
             .clipShape(RoundedRectangle(cornerRadius: 16))
             .padding(4)
-            .frame(width: 680, height: 620)
+            .frame(width: 680, height: 660)
     }
 }

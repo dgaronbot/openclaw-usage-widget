@@ -8,13 +8,16 @@ struct DashboardView: View {
     @State private var isVisible = false
     @State private var lastUpdateText = ""
 
-    private let updateTimer = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
-
     var body: some View {
         ZStack {
             // Animated background
-            AnimatedGradient(baseColors: backgroundColors, isActive: isVisible)
-                .ignoresSafeArea()
+            if settingsStore.animatedGradientEnabled {
+                AnimatedGradient(baseColors: backgroundColors, isActive: isVisible)
+                    .ignoresSafeArea()
+            } else {
+                backgroundColors.first
+                    .ignoresSafeArea()
+            }
 
             HStack(spacing: 0) {
                 // Left column (~55%) — Metrics
@@ -29,17 +32,19 @@ struct DashboardView: View {
         }
         .onAppear {
             isVisible = true
-            refreshLastUpdateText()
-            // Single refresh on appear — auto-refresh lifecycle is owned by StatusBarController
-            if settingsStore.hasCompletedOnboarding {
-                Task { await usageStore.refresh(thresholds: themeStore.thresholds) }
-            }
         }
         .onDisappear {
             isVisible = false
         }
-        .onReceive(updateTimer) { _ in
+        .task {
             refreshLastUpdateText()
+            if settingsStore.hasCompletedOnboarding {
+                await usageStore.refresh(thresholds: themeStore.thresholds)
+            }
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(30))
+                refreshLastUpdateText()
+            }
         }
         .onChange(of: usageStore.lastUpdate) { _, _ in
             refreshLastUpdateText()
@@ -153,7 +158,7 @@ struct DashboardView: View {
             }
 
             Button {
-                Task { await usageStore.refresh(thresholds: themeStore.thresholds) }
+                Task { await usageStore.refresh(thresholds: themeStore.thresholds, force: true) }
             } label: {
                 Image(systemName: "arrow.clockwise")
                     .font(.system(size: 12))
@@ -167,14 +172,16 @@ struct DashboardView: View {
 
     private var heroSection: some View {
         ZStack {
-            ParticleField(
-                particleCount: 25,
-                speed: Double(usageStore.fiveHourPct) / 100.0,
-                color: gaugeColor(for: usageStore.fiveHourPct),
-                radius: 130,
-                isActive: isVisible
-            )
-            .frame(width: 280, height: 280)
+            if settingsStore.particlesEnabled {
+                ParticleField(
+                    particleCount: 25,
+                    speed: Double(usageStore.fiveHourPct) / 100.0,
+                    color: gaugeColor(for: usageStore.fiveHourPct),
+                    radius: 130,
+                    isActive: isVisible
+                )
+                .frame(width: 280, height: 280)
+            }
 
             RingGauge(
                 percentage: usageStore.fiveHourPct,

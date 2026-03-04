@@ -1,12 +1,16 @@
 import SwiftUI
+import Combine
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     var usageStore: UsageStore!
     var themeStore: ThemeStore!
     var settingsStore: SettingsStore!
     var updateStore: UpdateStore!
+    var sessionStore: SessionStore!
 
     private var statusBarController: StatusBarController?
+    private var overlayWindowController: OverlayWindowController?
+    private var monitorCancellable: AnyCancellable?
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false
@@ -17,8 +21,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             usageStore: usageStore,
             themeStore: themeStore,
             settingsStore: settingsStore,
-            updateStore: updateStore
+            updateStore: updateStore,
+            sessionStore: sessionStore
         )
+        if settingsStore.sessionMonitorEnabled {
+            sessionStore.startMonitoring()
+        }
+        overlayWindowController = OverlayWindowController(
+            sessionStore: sessionStore,
+            settingsStore: settingsStore
+        )
+
+        monitorCancellable = settingsStore.$sessionMonitorEnabled
+            .dropFirst()
+            .sink { [weak self] enabled in
+                guard let self else { return }
+                if enabled {
+                    self.sessionStore.startMonitoring()
+                } else {
+                    self.sessionStore.stopMonitoring()
+                }
+            }
     }
 }
 
@@ -30,6 +53,7 @@ struct TokenEaterApp: App {
     private let themeStore = ThemeStore()
     private let settingsStore = SettingsStore()
     private let updateStore = UpdateStore()
+    private let sessionStore = SessionStore()
 
     init() {
         NotificationService().setupDelegate()
@@ -37,6 +61,7 @@ struct TokenEaterApp: App {
         appDelegate.themeStore = themeStore
         appDelegate.settingsStore = settingsStore
         appDelegate.updateStore = updateStore
+        appDelegate.sessionStore = sessionStore
     }
 
     var body: some Scene {
