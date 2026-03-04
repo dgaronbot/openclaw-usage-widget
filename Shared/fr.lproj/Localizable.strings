@@ -280,6 +280,9 @@
 "settings.watchers.kitty.title" = "Configuration Kitty";
 "settings.watchers.kitty.hint" = "Si vous utilisez Kitty, ajoutez cette ligne à votre kitty.conf pour que TokenEater puisse basculer vers le bon onglet au clic :";
 "settings.watchers.kitty.copy" = "Copier";
+"settings.watchers.style" = "Style de l'overlay";
+"settings.watchers.style.frost" = "Frost";
+"settings.watchers.style.neon" = "Neon";
 
 /* Onboarding - Agent Watchers */
 "onboarding.watchers.title" = "Agent Watchers";
