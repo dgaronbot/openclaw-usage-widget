@@ -43,6 +43,7 @@ struct OverlayView: View {
                         contentOffset += value.translation.height
                         contentOffset = max(-maxOffset, min(maxOffset, contentOffset))
                     }
+                    overlayState.contentOffset = contentOffset
                 }
         )
     }
