@@ -16,7 +16,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         false
     }
 
+    @objc private func handleGetURL(_ event: NSAppleEventDescriptor, withReplyEvent reply: NSAppleEventDescriptor) {
+        NotificationCenter.default.post(name: .openDashboard, object: nil)
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
+        NSAppleEventManager.shared().setEventHandler(
+            self,
+            andSelector: #selector(handleGetURL(_:withReplyEvent:)),
+            forEventClass: AEEventClass(kInternetEventClass),
+            andEventID: AEEventID(kAEGetURL)
+        )
+
         statusBarController = StatusBarController(
             usageStore: usageStore,
             themeStore: themeStore,
