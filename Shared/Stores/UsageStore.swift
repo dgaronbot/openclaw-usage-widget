@@ -148,7 +148,7 @@ final class UsageStore: ObservableObject {
         }
     }
 
-    func startAutoRefresh(interval: TimeInterval = 120, thresholds: UsageThresholds = .default) {
+    func startAutoRefresh(interval: TimeInterval = 300, thresholds: UsageThresholds = .default) {
         autoRefreshTask?.cancel()
         autoRefreshTask = Task { [weak self] in
             // Wait first — reloadConfig already triggers an initial refresh
