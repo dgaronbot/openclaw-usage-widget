@@ -1,11 +1,10 @@
 import Foundation
 
 protocol KeychainServiceProtocol: Sendable {
-    /// Interactive read — may trigger macOS Keychain dialog.
-    func readOAuthToken() -> String?
-    /// Silent read — never triggers dialog. Returns nil if auth is needed.
-    func readOAuthTokenSilently() -> String?
-    /// Read token from credentials file only — no Keychain access at all.
-    func readCredentialsFileToken() -> String?
+    /// Read OAuth token from ~/.claude/.credentials.json.
+    func readToken() -> String?
+    /// Check if credentials file or Keychain has a token (silent, no popup).
     func tokenExists() -> Bool
+    /// Silent Keychain read — for boot/onboarding only. Never triggers a dialog.
+    func readKeychainTokenSilently() -> String?
 }

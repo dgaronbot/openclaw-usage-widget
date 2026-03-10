@@ -74,13 +74,10 @@ final class UsageStore: ObservableObject {
             return
         }
 
-        // Token recovery — try credentials file first, then silent Keychain read.
-        // Covers Claude Code versions that only store in Keychain (no .credentials.json).
+        // Token recovery — credentials file only (no Keychain access).
+        // Avoids macOS Keychain popups after sleep. Keychain is only read at boot/onboarding.
         if !repository.isConfigured || lastFailedToken == repository.currentToken {
             repository.syncCredentialsFile()
-            if !repository.isConfigured || lastFailedToken == repository.currentToken {
-                repository.syncKeychainTokenSilently()
-            }
             if let currentToken = repository.currentToken, currentToken != lastFailedToken {
                 lastFailedToken = nil
                 errorState = .none
@@ -140,10 +137,9 @@ final class UsageStore: ObservableObject {
     }
 
     func reloadConfig(thresholds: UsageThresholds = .default) {
-        // Token sync — credentials file first, then silent Keychain fallback
         repository.syncCredentialsFile()
         if !repository.isConfigured {
-            repository.syncKeychainTokenSilently()
+            repository.syncKeychainSilently()
         }
         lastFailedToken = nil
         errorState = .none
@@ -188,7 +184,10 @@ final class UsageStore: ObservableObject {
     }
 
     func reauthenticate() async {
-        repository.syncKeychainToken()  // interactive — 1 prompt
+        repository.syncCredentialsFile()
+        if !repository.isConfigured {
+            repository.syncKeychainSilently()
+        }
         if repository.isConfigured, repository.currentToken != lastFailedToken {
             lastFailedToken = nil
             errorState = .none
@@ -204,7 +203,7 @@ final class UsageStore: ObservableObject {
     func connectAutoDetect() async -> ConnectionTestResult {
         repository.syncCredentialsFile()
         if !repository.isConfigured {
-            repository.syncKeychainTokenSilently()
+            repository.syncKeychainSilently()
         }
         let result = await repository.testConnection(proxyConfig: proxyConfig)
         if result.success {

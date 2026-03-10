@@ -1,6 +1,9 @@
 import Foundation
 import Security
 
+/// Reads OAuth tokens from the Claude Code credentials file (~/.claude/.credentials.json)
+/// with silent Keychain fallback for boot/onboarding only.
+/// The auto-refresh cycle never touches the Keychain to avoid popup dialogs after sleep.
 final class KeychainService: KeychainServiceProtocol, @unchecked Sendable {
 
     private let credentialsFileReader: CredentialsFileReaderProtocol
@@ -9,18 +12,7 @@ final class KeychainService: KeychainServiceProtocol, @unchecked Sendable {
         self.credentialsFileReader = credentialsFileReader
     }
 
-    /// Interactive read — may trigger macOS Keychain dialog.
-    func readOAuthToken() -> String? {
-        credentialsFileReader.readToken() ?? readKeychainToken(allowUI: true)
-    }
-
-    /// Silent read — never triggers a dialog. Returns nil if auth is needed.
-    func readOAuthTokenSilently() -> String? {
-        credentialsFileReader.readToken() ?? readKeychainToken(allowUI: false)
-    }
-
-    /// Read token from credentials file only — no Keychain access at all.
-    func readCredentialsFileToken() -> String? {
+    func readToken() -> String? {
         credentialsFileReader.readToken()
     }
 
@@ -39,19 +31,17 @@ final class KeychainService: KeychainServiceProtocol, @unchecked Sendable {
         return status == errSecSuccess
     }
 
-    // MARK: - Private
+    func readKeychainTokenSilently() -> String? {
+        // Credentials file first — no Keychain access needed
+        if let token = credentialsFileReader.readToken() { return token }
 
-    private func readKeychainToken(allowUI: Bool) -> String? {
         var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: "Claude Code-credentials",
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne,
+            kSecUseAuthenticationUI as String: kSecUseAuthenticationUISkip,
         ]
-
-        if !allowUI {
-            query[kSecUseAuthenticationUI as String] = kSecUseAuthenticationUISkip
-        }
 
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
