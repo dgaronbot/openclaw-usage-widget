@@ -78,7 +78,7 @@ function getStyles(fontSize, width) {
       boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
       width: width,
       minWidth: 260,
-      maxWidth: 600,
+      maxWidth: 1400,
       resize: "horizontal",
       overflow: "auto",
       fontSize: fontSize,
@@ -402,7 +402,10 @@ function RangeTabs({ range, onRangeChange, s }) {
 const DEFAULT_FONT_SIZE = 12;
 const DEFAULT_WIDTH = 340;
 const MIN_FONT_SIZE = 9;
-const MAX_FONT_SIZE = 18;
+const MAX_FONT_SIZE = 48;
+const MIN_WIDTH = 260;
+const MAX_WIDTH = 1400;
+const WIDTH_STEP = 40;
 
 export const initialState = {
   data: null,
@@ -410,13 +413,21 @@ export const initialState = {
   localRange: "today",
   fontSize: DEFAULT_FONT_SIZE,
   width: DEFAULT_WIDTH,
+  prefsLoaded: false,
 };
 
 export const updateState = (event, prevState) => {
   if (event.type === "UB/COMMAND_RAN") {
     try {
       const data = JSON.parse(event.output);
-      return { ...prevState, data };
+      const next = { ...prevState, data };
+      // Apply saved prefs on first load
+      if (!prevState.prefsLoaded && data.prefs) {
+        if (data.prefs.fontSize) next.fontSize = data.prefs.fontSize;
+        if (data.prefs.width) next.width = data.prefs.width;
+        next.prefsLoaded = true;
+      }
+      return next;
     } catch (e) {
       return prevState;
     }
@@ -430,22 +441,38 @@ export const updateState = (event, prevState) => {
   if (event.type === "SET_FONT_SIZE") {
     return { ...prevState, fontSize: event.fontSize };
   }
+  if (event.type === "SET_WIDTH") {
+    return { ...prevState, width: event.width };
+  }
   return prevState;
 };
 
-export const render = ({ data, apiRange, localRange, fontSize }, dispatch) => {
+export const render = ({ data, apiRange, localRange, fontSize, width }, dispatch) => {
   const fs = fontSize || DEFAULT_FONT_SIZE;
-  const s = getStyles(fs, DEFAULT_WIDTH);
+  const w = width || DEFAULT_WIDTH;
+  const s = getStyles(fs, w);
+
+  const persistPrefs = (prefs) => {
+    try {
+      const run = require("child_process").execSync;
+      run(`echo '${JSON.stringify(prefs)}' > $HOME/.token-monitor-prefs.json`);
+    } catch (e) {}
+  };
 
   const changeFontSize = (delta) => {
-    const next = Math.min(MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, fs + delta));
+    const step = fs >= 18 ? 2 : 1;
+    const next = Math.min(MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, fs + delta * step));
     if (next !== fs) {
       dispatch({ type: "SET_FONT_SIZE", fontSize: next });
-      // Persist preference
-      try {
-        const run = require("child_process").execSync;
-        run(`echo '${JSON.stringify({ fontSize: next })}' > $HOME/.token-monitor-prefs.json`);
-      } catch (e) {}
+      persistPrefs({ fontSize: next, width: w });
+    }
+  };
+
+  const changeWidth = (delta) => {
+    const next = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, w + delta * WIDTH_STEP));
+    if (next !== w) {
+      dispatch({ type: "SET_WIDTH", width: next });
+      persistPrefs({ fontSize: fs, width: next });
     }
   };
 
@@ -465,6 +492,9 @@ export const render = ({ data, apiRange, localRange, fontSize }, dispatch) => {
       <div style={s.header}>
         <span style={s.title}>Token Monitor</span>
         <div style={s.headerRight}>
+          <button style={s.sizeBtn} onClick={() => changeWidth(-1)} title="Decrease width">◀</button>
+          <button style={s.sizeBtn} onClick={() => changeWidth(1)} title="Increase width">▶</button>
+          <span style={{ ...s.lastUpdated, margin: "0 4px", opacity: 0.4 }}>│</span>
           <button style={s.sizeBtn} onClick={() => changeFontSize(-1)} title="Decrease font size">−</button>
           <span style={{ ...s.lastUpdated, minWidth: 18, textAlign: "center" }}>{fs}</span>
           <button style={s.sizeBtn} onClick={() => changeFontSize(1)} title="Increase font size">+</button>

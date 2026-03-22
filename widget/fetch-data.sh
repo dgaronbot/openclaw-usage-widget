@@ -216,7 +216,20 @@ print(json.dumps(result))
 PYEOF
 )
 
+# --- Merge saved prefs into output ---
 if [ -n "$output" ] && [ "$output" != "null" ]; then
+    if [ -f "$PREFS_FILE" ]; then
+        output=$(python3 -c "
+import json, sys
+data = json.loads('''$output''')
+try:
+    with open('$PREFS_FILE') as f:
+        prefs = json.load(f)
+    data['prefs'] = prefs
+except: pass
+print(json.dumps(data))
+")
+    fi
     echo "$output" > "$CACHE_FILE"
     echo "$output"
 else
