@@ -1,132 +1,87 @@
-<p align="center">
-  <img src="TokenEaterApp/Assets.xcassets/AppIcon.appiconset/icon_256x256.png" width="128" height="128" alt="TokenEater">
-</p>
-
-<h1 align="center">TokenEater</h1>
+<h1 align="center">Token Monitor</h1>
 
 <p align="center">
-  <strong>Monitor your Claude AI usage limits directly from your macOS desktop.</strong>
-  <br>
-  <a href="https://tokeneater.vercel.app">Website</a> · <a href="https://tokeneater.vercel.app/en/docs">Docs</a> · <a href="https://github.com/AThevon/TokenEater/releases/latest">Download</a>
+  <strong>An <a href="http://tracesof.net/uebersicht/">Übersicht</a> widget for macOS that monitors Claude Code usage, OpenClaw API spend, and local MLX inference — all in one floating desktop panel.</strong>
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/macOS-14%2B-111?logo=apple&logoColor=white" alt="macOS 14+">
-  <img src="https://img.shields.io/badge/Swift-5.9-F05138?logo=swift&logoColor=white" alt="Swift 5.9">
-  <img src="https://img.shields.io/badge/WidgetKit-native-007AFF?logo=apple&logoColor=white" alt="WidgetKit">
+  <img src="https://img.shields.io/badge/%C3%9Cbersicht-widget-007AFF" alt="Übersicht widget">
   <img src="https://img.shields.io/badge/Claude-Pro%20%2F%20Max%20%2F%20Team-D97706" alt="Claude Pro / Max / Team">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License">
-  <img src="https://img.shields.io/github/v/release/AThevon/TokenEater?color=F97316" alt="Release">
-  <a href="https://buymeacoffee.com/athevon"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?logo=buymeacoffee&logoColor=black" alt="Buy Me a Coffee"></a>
 </p>
 
 ---
 
-> **Requires a Claude Pro, Max, or Team plan.** The free plan does not expose usage data.
+## What it shows
 
-## What is TokenEater?
+### Panel 1 — Claude Code Subscription
+- 5-hour and 7-day usage buckets with percentage bars
+- Color-coded: green (<50%), yellow (50–80%), red (>80%)
+- Reset countdown for each bucket
+- Extra usage spend tracking
 
-A native macOS menu bar app + desktop widgets + floating overlay that tracks your Claude AI usage in real-time.
+### Panel 2 — OpenClaw API Spend
+- Total cost with per-model breakdown (Anthropic, OpenRouter, etc.)
+- Input/output token counts per model
+- Toggle between Today / 7 Days / All Time
 
-- **Menu bar** — Live percentages, color-coded thresholds, detailed popover dashboard
-- **Widgets** — Native WidgetKit widgets (usage gauges, progress bars, pacing) with reactive refresh
-- **Agent Watchers** — Floating overlay showing active Claude Code sessions with dock-like hover effect. Click to jump to the right terminal.
-- **Smart pacing** — Are you burning through tokens or cruising? Three zones: chill, on track, hot.
-- **Themes** — 4 presets + full custom colors. Configurable warning/critical thresholds.
-- **Notifications** — Alerts at warning, critical, and reset.
-
-See all features in detail on the [website](https://tokeneater.vercel.app).
+### Panel 3 — Local MLX Usage
+- Local model token counts (free, no cost)
+- Same time range toggle as API panel
 
 ## Install
 
-### Download DMG (recommended)
+### Prerequisites
+- [Übersicht](http://tracesof.net/uebersicht/) installed
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) authenticated (`claude` → `/login`) with a **Pro, Max, or Team plan**
+- (Optional) [OpenClaw](https://github.com/AThevon/openclaw) gateway running locally for panels 2 & 3
 
-**[Download TokenEater.dmg](https://github.com/AThevon/TokenEater/releases/latest/download/TokenEater.dmg)**
-
-Open the DMG, drag TokenEater to Applications, then:
-
-1. Double-click TokenEater in Applications — macOS will block it
-2. Open **System Settings → Privacy & Security** — scroll down to find the message about TokenEater
-3. Click **Open Anyway** and confirm
-
-> **Important:** Do not use `xattr -cr` to bypass this step — it prevents macOS from approving the widget extension, which will then be flagged as malware in the widget gallery.
-
-### Homebrew
+### Setup
 
 ```bash
-brew tap AThevon/tokeneater
-brew install --cask tokeneater
+# Clone into your Übersicht widgets directory
+cp -r widget/ ~/Library/Application\ Support/Übersicht/widgets/token-monitor/
+chmod +x ~/Library/Application\ Support/Übersicht/widgets/token-monitor/fetch-data.sh
 ```
 
-### First Setup
-
-**Prerequisites:** [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed and authenticated (`claude` then `/login`). Requires a **Pro, Max, or Team plan**.
-
-1. Open TokenEater — a guided setup walks you through connecting your account
-2. Right-click on desktop > **Edit Widgets** > search "TokenEater"
-
-## Update
-
-TokenEater checks for updates automatically. When a new version is available, a modal lets you download and install it in-app — macOS will ask for your admin password to replace the app in `/Applications`.
-
-If you installed via Homebrew: `brew update && brew upgrade --cask tokeneater`
-
-## Uninstall
-
-Delete `TokenEater.app` from Applications, then optionally clean up shared data:
+Or symlink for development:
 ```bash
-rm -rf /Applications/TokenEater.app
-rm -rf ~/Library/Application\ Support/com.tokeneater.shared
+ln -s "$(pwd)/widget" ~/Library/Application\ Support/Übersicht/widgets/token-monitor
 ```
 
-If installed via Homebrew: `brew uninstall --cask tokeneater`
+Übersicht will auto-detect the widget and render it on your desktop.
 
-## Build from source
+## Configuration
 
-```bash
-# Requirements: macOS 14+, Xcode 16.4+, XcodeGen (brew install xcodegen)
+Edit `index.jsx` to customize:
 
-git clone https://github.com/AThevon/TokenEater.git
-cd TokenEater
-xcodegen generate
-plutil -insert NSExtension -json '{"NSExtensionPointIdentifier":"com.apple.widgetkit-extension"}' \
-  TokenEaterWidget/Info.plist 2>/dev/null || true
-xcodebuild -project TokenEater.xcodeproj -scheme TokenEaterApp \
-  -configuration Release -derivedDataPath build build
-cp -R "build/Build/Products/Release/TokenEater.app" /Applications/
-# Then approve via System Settings → Privacy & Security → Open Anyway
-```
-
-## Architecture
-
-```
-TokenEaterApp/           App host (settings, OAuth, menu bar, overlay)
-TokenEaterWidget/        Widget Extension (WidgetKit, reactive refresh)
-Shared/                  Shared code (services, stores, models, pacing)
-  ├── Models/            Pure Codable structs
-  ├── Services/          Protocol-based I/O (API, TokenProvider, SharedFile, Notification, SessionMonitor)
-  ├── Repositories/      Orchestration (UsageRepository)
-  ├── Stores/            ObservableObject state containers
-  └── Helpers/           Pure functions (PacingCalculator, MenuBarRenderer, JSONLParser)
-```
-
-The app reads Claude Code's OAuth token silently from the macOS Keychain (`kSecUseAuthenticationUISkip`), calls the Anthropic usage API, and writes results to a shared JSON file. A `TokenFileMonitor` watches for credential changes via FSEvents and triggers immediate refresh. The widget reads the shared file — it never touches the network or Keychain. The Agent Watchers overlay scans running Claude Code processes every 2s using macOS system APIs and tail-reads their JSONL logs.
+| Setting | Location | Default |
+|---------|----------|---------|
+| Position | `className` | `top: 20px; right: 20px` |
+| Width | `className` | `340px` |
+| Font size | `className` | `12px` |
+| Refresh interval | `refreshFrequency` | `60000` (60s) |
 
 ## How it works
 
 ```
-GET https://api.anthropic.com/api/oauth/usage
-Authorization: Bearer <token>
-anthropic-beta: oauth-2025-04-20
+fetch-data.sh
+├── Reads Claude Code OAuth token from macOS Keychain
+│   └── GET https://api.anthropic.com/api/oauth/usage
+├── Reads OpenClaw auth token from ~/.openclaw/openclaw.json
+│   └── GET http://localhost:18789/v1/usage?range={today|7d|all}
+└── Outputs combined JSON → index.jsx renders it
+
+Offline: falls back to /tmp/token-monitor-cache.json
 ```
 
-Returns `utilization` (0–100) and `resets_at` for each limit bucket.
+## Uninstall
 
-## Support
-
-If TokenEater saves you from hitting your limits blindly, consider [buying me a coffee](https://buymeacoffee.com/athevon) ☕
+```bash
+rm -rf ~/Library/Application\ Support/Übersicht/widgets/token-monitor/
+```
 
 ## License
 
 MIT
-
