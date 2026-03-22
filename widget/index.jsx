@@ -5,12 +5,12 @@ export const command = `bash "$HOME/Library/Application Support/Übersicht/widge
 
 export const refreshFrequency = 60000; // 60 seconds
 
+const PREFS_FILE = "~/.token-monitor-prefs.json";
+
 export const className = `
   top: 20px;
   right: 20px;
-  width: 340px;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
-  font-size: 12px;
   color: #e0e0e0;
   z-index: 1;
 `;
@@ -53,6 +53,7 @@ function usageColor(pct) {
 
 function formatCost(v) {
   if (v == null) return "$0.00";
+  if (v < 0.01 && v > 0) return "$" + v.toFixed(4);
   return "$" + v.toFixed(2);
 }
 
@@ -63,158 +64,186 @@ function formatTokens(n) {
   return n.toString();
 }
 
-// --- Styles ---
+// --- Dynamic styles factory ---
 
-const styles = {
-  container: {
-    background: "rgba(30, 30, 30, 0.88)",
-    backdropFilter: "blur(20px)",
-    WebkitBackdropFilter: "blur(20px)",
-    borderRadius: 12,
-    border: "1px solid rgba(255,255,255,0.08)",
-    padding: "14px 16px",
-    boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
-  },
-  header: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  title: {
-    fontSize: 13,
-    fontWeight: 600,
-    color: "#fff",
-    letterSpacing: "-0.2px",
-  },
-  lastUpdated: {
-    fontSize: 10,
-    color: "#666",
-  },
-  section: {
-    marginBottom: 12,
-  },
-  sectionLast: {
-    marginBottom: 0,
-  },
-  sectionTitle: {
-    fontSize: 10,
-    fontWeight: 600,
-    color: "#888",
-    textTransform: "uppercase",
-    letterSpacing: "0.5px",
-    marginBottom: 6,
-  },
-  divider: {
-    height: 1,
-    background: "rgba(255,255,255,0.06)",
-    margin: "10px 0",
-  },
-  row: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 3,
-    lineHeight: "18px",
-  },
-  label: {
-    color: "#999",
-    fontSize: 11,
-  },
-  value: {
-    fontWeight: 500,
-    fontSize: 11,
-    fontVariantNumeric: "tabular-nums",
-  },
-  bar: {
-    height: 4,
-    borderRadius: 2,
-    background: "rgba(255,255,255,0.08)",
-    marginTop: 4,
-    marginBottom: 6,
-    overflow: "hidden",
-  },
-  barFill: {
-    height: "100%",
-    borderRadius: 2,
-    transition: "width 0.3s ease",
-  },
-  errorText: {
-    color: "#888",
-    fontSize: 11,
-    fontStyle: "italic",
-  },
-  tabs: {
-    display: "flex",
-    gap: 0,
-    marginBottom: 8,
-    background: "rgba(255,255,255,0.04)",
-    borderRadius: 6,
-    padding: 2,
-  },
-  tab: {
-    flex: 1,
-    textAlign: "center",
-    fontSize: 10,
-    padding: "3px 0",
-    borderRadius: 4,
-    cursor: "pointer",
-    color: "#777",
-    fontWeight: 500,
-  },
-  tabActive: {
-    background: "rgba(255,255,255,0.1)",
-    color: "#e0e0e0",
-  },
-  modelRow: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 2,
-    fontSize: 11,
-    lineHeight: "16px",
-  },
-  modelName: {
-    color: "#aaa",
-    flex: 1,
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    marginRight: 8,
-  },
-  modelTokens: {
-    color: "#999",
-    fontVariantNumeric: "tabular-nums",
-    marginRight: 8,
-    fontSize: 10,
-  },
-  modelCost: {
-    color: "#e0e0e0",
-    fontWeight: 500,
-    fontVariantNumeric: "tabular-nums",
-    minWidth: 44,
-    textAlign: "right",
-  },
-};
+function getStyles(fontSize, width) {
+  return {
+    container: {
+      background: "rgba(30, 30, 30, 0.88)",
+      backdropFilter: "blur(20px)",
+      WebkitBackdropFilter: "blur(20px)",
+      borderRadius: 12,
+      border: "1px solid rgba(255,255,255,0.08)",
+      padding: "14px 16px",
+      boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+      width: width,
+      minWidth: 260,
+      maxWidth: 600,
+      resize: "horizontal",
+      overflow: "auto",
+      fontSize: fontSize,
+    },
+    header: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 12,
+    },
+    title: {
+      fontSize: fontSize + 1,
+      fontWeight: 600,
+      color: "#fff",
+      letterSpacing: "-0.2px",
+    },
+    headerRight: {
+      display: "flex",
+      alignItems: "center",
+      gap: 6,
+    },
+    sizeBtn: {
+      background: "rgba(255,255,255,0.08)",
+      border: "none",
+      borderRadius: 4,
+      color: "#999",
+      fontSize: fontSize - 1,
+      width: 20,
+      height: 20,
+      cursor: "pointer",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      lineHeight: 1,
+      padding: 0,
+    },
+    lastUpdated: {
+      fontSize: fontSize - 2,
+      color: "#666",
+    },
+    section: {
+      marginBottom: 12,
+    },
+    sectionLast: {
+      marginBottom: 0,
+    },
+    sectionTitle: {
+      fontSize: fontSize - 2,
+      fontWeight: 600,
+      color: "#888",
+      textTransform: "uppercase",
+      letterSpacing: "0.5px",
+      marginBottom: 6,
+    },
+    divider: {
+      height: 1,
+      background: "rgba(255,255,255,0.06)",
+      margin: "10px 0",
+    },
+    row: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 3,
+      lineHeight: "18px",
+    },
+    label: {
+      color: "#999",
+      fontSize: fontSize - 1,
+    },
+    value: {
+      fontWeight: 500,
+      fontSize: fontSize - 1,
+      fontVariantNumeric: "tabular-nums",
+    },
+    bar: {
+      height: 4,
+      borderRadius: 2,
+      background: "rgba(255,255,255,0.08)",
+      marginTop: 4,
+      marginBottom: 6,
+      overflow: "hidden",
+    },
+    barFill: {
+      height: "100%",
+      borderRadius: 2,
+      transition: "width 0.3s ease",
+    },
+    errorText: {
+      color: "#888",
+      fontSize: fontSize - 1,
+      fontStyle: "italic",
+    },
+    tabs: {
+      display: "flex",
+      gap: 0,
+      marginBottom: 8,
+      background: "rgba(255,255,255,0.04)",
+      borderRadius: 6,
+      padding: 2,
+    },
+    tab: {
+      flex: 1,
+      textAlign: "center",
+      fontSize: fontSize - 2,
+      padding: "3px 0",
+      borderRadius: 4,
+      cursor: "pointer",
+      color: "#777",
+      fontWeight: 500,
+    },
+    tabActive: {
+      background: "rgba(255,255,255,0.1)",
+      color: "#e0e0e0",
+    },
+    modelRow: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 2,
+      fontSize: fontSize - 1,
+      lineHeight: "16px",
+    },
+    modelName: {
+      color: "#aaa",
+      flex: 1,
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap",
+      marginRight: 8,
+    },
+    modelTokens: {
+      color: "#999",
+      fontVariantNumeric: "tabular-nums",
+      marginRight: 8,
+      fontSize: fontSize - 2,
+    },
+    modelCost: {
+      color: "#e0e0e0",
+      fontWeight: 500,
+      fontVariantNumeric: "tabular-nums",
+      minWidth: 44,
+      textAlign: "right",
+    },
+  };
+}
 
 // --- Usage Bar Component ---
 
-function UsageBar({ label, pct, resetsAt }) {
+function UsageBar({ label, pct, resetsAt, s }) {
   const color = usageColor(pct);
   const remaining = Math.max(0, 100 - pct);
   return (
     <div>
-      <div style={styles.row}>
-        <span style={styles.label}>{label}</span>
-        <span style={{ ...styles.value, color }}>
+      <div style={s.row}>
+        <span style={s.label}>{label}</span>
+        <span style={{ ...s.value, color }}>
           {pct}% used · {remaining}% left
         </span>
       </div>
-      <div style={styles.bar}>
-        <div style={{ ...styles.barFill, width: `${pct}%`, background: color }} />
+      <div style={s.bar}>
+        <div style={{ ...s.barFill, width: `${pct}%`, background: color }} />
       </div>
       {resetsAt && (
-        <div style={{ ...styles.label, fontSize: 10, marginBottom: 2 }}>
+        <div style={{ ...s.label, fontSize: s.label.fontSize - 1, marginBottom: 2 }}>
           Resets {formatDate(resetsAt)}
         </div>
       )}
@@ -224,20 +253,20 @@ function UsageBar({ label, pct, resetsAt }) {
 
 // --- Claude Panel ---
 
-function ClaudePanel({ data, error }) {
+function ClaudePanel({ data, error, s }) {
   if (error && !data) {
     return (
-      <div style={styles.section}>
-        <div style={styles.sectionTitle}>Claude Code</div>
-        <div style={styles.errorText}>{error}</div>
+      <div style={s.section}>
+        <div style={s.sectionTitle}>Claude Code</div>
+        <div style={s.errorText}>{error}</div>
       </div>
     );
   }
   if (!data) {
     return (
-      <div style={styles.section}>
-        <div style={styles.sectionTitle}>Claude Code</div>
-        <div style={styles.errorText}>No data</div>
+      <div style={s.section}>
+        <div style={s.sectionTitle}>Claude Code</div>
+        <div style={s.errorText}>No data</div>
       </div>
     );
   }
@@ -254,15 +283,15 @@ function ClaudePanel({ data, error }) {
   const extra = data.extra_usage;
 
   return (
-    <div style={styles.section}>
-      <div style={styles.sectionTitle}>Claude Code</div>
+    <div style={s.section}>
+      <div style={s.sectionTitle}>Claude Code</div>
       {buckets.map((b, i) => (
-        <UsageBar key={i} label={b.label} pct={b.utilization} resetsAt={b.resets_at} />
+        <UsageBar key={i} label={b.label} pct={b.utilization} resetsAt={b.resets_at} s={s} />
       ))}
       {extra && extra.is_enabled && (
-        <div style={{ ...styles.row, marginTop: 4 }}>
-          <span style={styles.label}>Extra usage</span>
-          <span style={styles.value}>
+        <div style={{ ...s.row, marginTop: 4 }}>
+          <span style={s.label}>Extra usage</span>
+          <span style={s.value}>
             {formatCost(extra.used_credits)} / {formatCost(extra.monthly_limit)}
           </span>
         </div>
@@ -273,37 +302,37 @@ function ClaudePanel({ data, error }) {
 
 // --- OpenClaw API Panel ---
 
-function OpenClawAPIPanel({ data, error, range, onRangeChange }) {
+function OpenClawAPIPanel({ data, error, range, onRangeChange, s }) {
   const rangeData = data && data[range];
   const apiData = rangeData && rangeData.api;
 
   return (
-    <div style={styles.section}>
-      <div style={styles.sectionTitle}>OpenClaw API Spend</div>
-      <RangeTabs range={range} onRangeChange={onRangeChange} />
+    <div style={s.section}>
+      <div style={s.sectionTitle}>OpenClaw API Spend</div>
+      <RangeTabs range={range} onRangeChange={onRangeChange} s={s} />
       {error && !apiData ? (
-        <div style={styles.errorText}>{error}</div>
+        <div style={s.errorText}>{error}</div>
       ) : !apiData ? (
-        <div style={styles.errorText}>No API usage data</div>
+        <div style={s.errorText}>No API usage data</div>
       ) : (
         <div>
-          <div style={styles.row}>
-            <span style={styles.label}>Total cost</span>
-            <span style={{ ...styles.value, color: "#e0e0e0" }}>
+          <div style={s.row}>
+            <span style={s.label}>Total cost</span>
+            <span style={{ ...s.value, color: "#e0e0e0" }}>
               {formatCost(apiData.totalCost != null ? apiData.totalCost : apiData.total_cost)}
             </span>
           </div>
           {apiData.models && apiData.models.length > 0 && (
             <div style={{ marginTop: 4 }}>
               {apiData.models.map((m, i) => (
-                <div key={i} style={styles.modelRow}>
-                  <span style={styles.modelName}>
+                <div key={i} style={s.modelRow}>
+                  <span style={s.modelName}>
                     {m.provider}/{m.model}
                   </span>
-                  <span style={styles.modelTokens}>
+                  <span style={s.modelTokens}>
                     {formatTokens(m.input_tokens || m.inputTokens)}↑ {formatTokens(m.output_tokens || m.outputTokens)}↓
                   </span>
-                  <span style={styles.modelCost}>{formatCost(m.cost)}</span>
+                  <span style={s.modelCost}>{formatCost(m.cost)}</span>
                 </div>
               ))}
             </div>
@@ -316,27 +345,27 @@ function OpenClawAPIPanel({ data, error, range, onRangeChange }) {
 
 // --- Local MLX Panel ---
 
-function LocalMLXPanel({ data, error, range, onRangeChange }) {
+function LocalMLXPanel({ data, error, range, onRangeChange, s }) {
   const rangeData = data && data[range];
   const localData = rangeData && rangeData.local;
 
   return (
-    <div style={styles.sectionLast}>
-      <div style={styles.sectionTitle}>Local MLX</div>
-      <RangeTabs range={range} onRangeChange={onRangeChange} />
+    <div style={s.sectionLast}>
+      <div style={s.sectionTitle}>Local MLX</div>
+      <RangeTabs range={range} onRangeChange={onRangeChange} s={s} />
       {error && !localData ? (
-        <div style={styles.errorText}>{error}</div>
+        <div style={s.errorText}>{error}</div>
       ) : !localData || !localData.models || localData.models.length === 0 ? (
-        <div style={styles.errorText}>No local model usage</div>
+        <div style={s.errorText}>No local model usage</div>
       ) : (
         <div>
           {localData.models.map((m, i) => (
-            <div key={i} style={styles.modelRow}>
-              <span style={styles.modelName}>{m.model}</span>
-              <span style={styles.modelTokens}>
+            <div key={i} style={s.modelRow}>
+              <span style={s.modelName}>{m.model}</span>
+              <span style={s.modelTokens}>
                 {formatTokens(m.input_tokens || m.inputTokens)}↑ {formatTokens(m.output_tokens || m.outputTokens)}↓
               </span>
-              <span style={{ ...styles.modelCost, color: "#28c840" }}>free</span>
+              <span style={{ ...s.modelCost, color: "#28c840" }}>free</span>
             </div>
           ))}
         </div>
@@ -347,18 +376,18 @@ function LocalMLXPanel({ data, error, range, onRangeChange }) {
 
 // --- Range Tabs ---
 
-function RangeTabs({ range, onRangeChange }) {
+function RangeTabs({ range, onRangeChange, s }) {
   const ranges = [
     { key: "today", label: "Today" },
     { key: "7d", label: "7 Days" },
     { key: "all", label: "All Time" },
   ];
   return (
-    <div style={styles.tabs}>
+    <div style={s.tabs}>
       {ranges.map((r) => (
         <div
           key={r.key}
-          style={{ ...styles.tab, ...(range === r.key ? styles.tabActive : {}) }}
+          style={{ ...s.tab, ...(range === r.key ? s.tabActive : {}) }}
           onClick={() => onRangeChange(r.key)}
         >
           {r.label}
@@ -370,10 +399,17 @@ function RangeTabs({ range, onRangeChange }) {
 
 // --- Main Widget ---
 
+const DEFAULT_FONT_SIZE = 12;
+const DEFAULT_WIDTH = 340;
+const MIN_FONT_SIZE = 9;
+const MAX_FONT_SIZE = 18;
+
 export const initialState = {
   data: null,
   apiRange: "today",
   localRange: "today",
+  fontSize: DEFAULT_FONT_SIZE,
+  width: DEFAULT_WIDTH,
 };
 
 export const updateState = (event, prevState) => {
@@ -391,48 +427,73 @@ export const updateState = (event, prevState) => {
   if (event.type === "SET_LOCAL_RANGE") {
     return { ...prevState, localRange: event.range };
   }
+  if (event.type === "SET_FONT_SIZE") {
+    return { ...prevState, fontSize: event.fontSize };
+  }
   return prevState;
 };
 
-export const render = ({ data, apiRange, localRange }, dispatch) => {
+export const render = ({ data, apiRange, localRange, fontSize }, dispatch) => {
+  const fs = fontSize || DEFAULT_FONT_SIZE;
+  const s = getStyles(fs, DEFAULT_WIDTH);
+
+  const changeFontSize = (delta) => {
+    const next = Math.min(MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, fs + delta));
+    if (next !== fs) {
+      dispatch({ type: "SET_FONT_SIZE", fontSize: next });
+      // Persist preference
+      try {
+        const run = require("child_process").execSync;
+        run(`echo '${JSON.stringify({ fontSize: next })}' > $HOME/.token-monitor-prefs.json`);
+      } catch (e) {}
+    }
+  };
+
   if (!data) {
     return (
-      <div style={styles.container}>
-        <div style={styles.header}>
-          <span style={styles.title}>Token Monitor</span>
+      <div style={s.container}>
+        <div style={s.header}>
+          <span style={s.title}>Token Monitor</span>
         </div>
-        <div style={styles.errorText}>Loading…</div>
+        <div style={s.errorText}>Loading…</div>
       </div>
     );
   }
 
   return (
-    <div style={styles.container}>
-      <div style={styles.header}>
-        <span style={styles.title}>Token Monitor</span>
-        <span style={styles.lastUpdated}>
-          {data.fetchedAt ? timeAgo(data.fetchedAt) : "—"}
-        </span>
+    <div style={s.container}>
+      <div style={s.header}>
+        <span style={s.title}>Token Monitor</span>
+        <div style={s.headerRight}>
+          <button style={s.sizeBtn} onClick={() => changeFontSize(-1)} title="Decrease font size">−</button>
+          <span style={{ ...s.lastUpdated, minWidth: 18, textAlign: "center" }}>{fs}</span>
+          <button style={s.sizeBtn} onClick={() => changeFontSize(1)} title="Increase font size">+</button>
+          <span style={{ ...s.lastUpdated, marginLeft: 4 }}>
+            {data.fetchedAt ? timeAgo(data.fetchedAt) : "—"}
+          </span>
+        </div>
       </div>
 
-      <ClaudePanel data={data.claude} error={data.claudeError} />
+      <ClaudePanel data={data.claude} error={data.claudeError} s={s} />
 
-      <div style={styles.divider} />
+      <div style={s.divider} />
 
       <OpenClawAPIPanel
         data={data.openclaw}
         error={data.openclawError}
         range={apiRange}
         onRangeChange={(r) => dispatch({ type: "SET_API_RANGE", range: r })}
+        s={s}
       />
 
-      <div style={styles.divider} />
+      <div style={s.divider} />
 
       <LocalMLXPanel
         data={data.openclaw}
         error={data.openclawError}
         range={localRange}
         onRangeChange={(r) => dispatch({ type: "SET_LOCAL_RANGE", range: r })}
+        s={s}
       />
     </div>
   );
