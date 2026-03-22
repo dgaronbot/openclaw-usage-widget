@@ -102,6 +102,34 @@ for f in glob.glob(sessions_dir + '/*.jsonl'):
     except:
         pass
 
+# Parse MLX proxy usage log (~/mlx-usage.jsonl)
+mlx_log = os.path.expanduser('~/mlx-usage.jsonl')
+if os.path.exists(mlx_log):
+    try:
+        with open(mlx_log) as fh:
+            for line in fh:
+                try:
+                    d = json.loads(line.strip())
+                    ts_str = d.get('ts', '')
+                    ts_date = ts_str[:10] if ts_str else ''
+                    model = d.get('model', 'mlx-local')
+                    # Ensure model is classified as local by adding mlx prefix if needed
+                    if not is_mlx_model(model):
+                        model = 'mlx/' + model
+                    entries.append({
+                        'model': model,
+                        'cost': 0,
+                        'date': ts_date,
+                        'timestamp': ts_str,
+                        'input_tokens': d.get('prompt_tokens', 0),
+                        'output_tokens': d.get('completion_tokens', 0),
+                        'cache_read': 0,
+                    })
+                except:
+                    pass
+    except:
+        pass
+
 def classify(model):
     if is_mlx_model(model):
         return 'local'
