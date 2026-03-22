@@ -7,6 +7,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var settingsStore: SettingsStore!
     var updateStore: UpdateStore!
     var sessionStore: SessionStore!
+    var openClawStore: OpenClawStore!
 
     private var statusBarController: StatusBarController?
     private var overlayWindowController: OverlayWindowController?
@@ -33,7 +34,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             themeStore: themeStore,
             settingsStore: settingsStore,
             updateStore: updateStore,
-            sessionStore: sessionStore
+            sessionStore: sessionStore,
+            openClawStore: openClawStore
         )
         if settingsStore.sessionMonitorEnabled {
             sessionStore.startMonitoring()
@@ -45,6 +47,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         updateStore.checkBrewMigration()
         updateStore.checkForUpdates()
+
+        if settingsStore.openClawEnabled {
+            let token = settingsStore.openClawAuthToken.isEmpty ? nil : settingsStore.openClawAuthToken
+            openClawStore.loadCache()
+            openClawStore.startAutoRefresh(baseURL: settingsStore.openClawGatewayURL, token: token)
+        }
 
         monitorCancellable = settingsStore.$sessionMonitorEnabled
             .dropFirst()
@@ -68,6 +76,7 @@ struct TokenEaterApp: App {
     private let settingsStore = SettingsStore()
     private let updateStore = UpdateStore()
     private let sessionStore = SessionStore()
+    private let openClawStore = OpenClawStore()
 
     init() {
         NotificationService().setupDelegate()
@@ -76,6 +85,7 @@ struct TokenEaterApp: App {
         appDelegate.settingsStore = settingsStore
         appDelegate.updateStore = updateStore
         appDelegate.sessionStore = sessionStore
+        appDelegate.openClawStore = openClawStore
     }
 
     var body: some Scene {

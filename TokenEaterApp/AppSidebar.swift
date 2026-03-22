@@ -66,6 +66,7 @@ extension AppSection {
     var iconName: String {
         switch self {
         case .dashboard: "chart.bar.fill"
+        case .openClaw: "network"
         case .display: "display"
         case .themes: "paintpalette.fill"
         case .agentWatchers: "eye.fill"
@@ -77,6 +78,7 @@ extension AppSection {
     var label: String {
         switch self {
         case .dashboard: String(localized: "sidebar.dashboard")
+        case .openClaw: "OpenClaw"
         case .display: String(localized: "sidebar.display")
         case .themes: String(localized: "sidebar.themes")
         case .agentWatchers: String(localized: "sidebar.agentWatchers")

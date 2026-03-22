@@ -72,6 +72,17 @@ final class SettingsStore: ObservableObject {
         didSet { UserDefaults.standard.set(refreshInterval, forKey: "refreshInterval") }
     }
 
+    // OpenClaw gateway
+    @Published var openClawEnabled: Bool {
+        didSet { UserDefaults.standard.set(openClawEnabled, forKey: "openClawEnabled") }
+    }
+    @Published var openClawGatewayURL: String {
+        didSet { UserDefaults.standard.set(openClawGatewayURL, forKey: "openClawGatewayURL") }
+    }
+    @Published var openClawAuthToken: String {
+        didSet { UserDefaults.standard.set(openClawAuthToken, forKey: "openClawAuthToken") }
+    }
+
     var proxyConfig: ProxyConfig {
         ProxyConfig(enabled: proxyEnabled, host: proxyHost, port: proxyPort)
     }
@@ -151,6 +162,9 @@ final class SettingsStore: ObservableObject {
             let val = UserDefaults.standard.integer(forKey: "refreshInterval")
             return val >= 180 ? val : 300
         }()
+        self.openClawEnabled = UserDefaults.standard.bool(forKey: "openClawEnabled")
+        self.openClawGatewayURL = UserDefaults.standard.string(forKey: "openClawGatewayURL") ?? "http://localhost:18789"
+        self.openClawAuthToken = UserDefaults.standard.string(forKey: "openClawAuthToken") ?? ""
         self.pacingDisplayMode = PacingDisplayMode(
             rawValue: UserDefaults.standard.string(forKey: "pacingDisplayMode") ?? "dotDelta"
         ) ?? .dotDelta

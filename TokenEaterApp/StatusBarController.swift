@@ -15,6 +15,7 @@ final class StatusBarController: NSObject {
     private let settingsStore: SettingsStore
     private let updateStore: UpdateStore
     private let sessionStore: SessionStore
+    private let openClawStore: OpenClawStore
     private let tokenFileMonitor: TokenFileMonitorProtocol
 
     init(
@@ -23,6 +24,7 @@ final class StatusBarController: NSObject {
         settingsStore: SettingsStore,
         updateStore: UpdateStore,
         sessionStore: SessionStore,
+        openClawStore: OpenClawStore,
         tokenFileMonitor: TokenFileMonitorProtocol = TokenFileMonitor()
     ) {
         self.usageStore = usageStore
@@ -30,6 +32,7 @@ final class StatusBarController: NSObject {
         self.settingsStore = settingsStore
         self.updateStore = updateStore
         self.sessionStore = sessionStore
+        self.openClawStore = openClawStore
         self.tokenFileMonitor = tokenFileMonitor
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         self.statusItem.isVisible = settingsStore.showMenuBar
@@ -245,6 +248,7 @@ final class StatusBarController: NSObject {
             .environmentObject(settingsStore)
             .environmentObject(updateStore)
             .environmentObject(sessionStore)
+            .environmentObject(openClawStore)
 
         let isOnboarding = !settingsStore.hasCompletedOnboarding
         let size = isOnboarding ? NSSize(width: 680, height: 660) : NSSize(width: 820, height: 580)

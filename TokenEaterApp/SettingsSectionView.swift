@@ -6,6 +6,8 @@ struct SettingsSectionView: View {
     @EnvironmentObject private var themeStore: ThemeStore
     @EnvironmentObject private var updateStore: UpdateStore
 
+    @EnvironmentObject private var openClawStore: OpenClawStore
+
     @State private var isTesting = false
     @State private var testResult: ConnectionTestResult?
     @State private var isImporting = false
@@ -13,6 +15,8 @@ struct SettingsSectionView: View {
     @State private var importSuccess = false
     @State private var notifTestCooldown = false
     @State private var brewCopied = false
+    @State private var openClawTesting = false
+    @State private var openClawTestResult: ConnectionTestResult?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -90,6 +94,62 @@ struct SettingsSectionView: View {
                                     .frame(width: 80)
                             }
                         }
+                    }
+                }
+            }
+
+            // OpenClaw Gateway
+            glassCard {
+                VStack(alignment: .leading, spacing: 8) {
+                    cardLabel("OpenClaw Gateway")
+                    darkToggle("Enable OpenClaw", isOn: $settingsStore.openClawEnabled)
+                    if settingsStore.openClawEnabled {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Gateway URL")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.white.opacity(0.4))
+                            TextField("http://localhost:18789", text: $settingsStore.openClawGatewayURL)
+                                .textFieldStyle(.roundedBorder)
+                                .font(.system(size: 12, design: .monospaced))
+                        }
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Auth Token (optional)")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.white.opacity(0.4))
+                            SecureField("Bearer token", text: $settingsStore.openClawAuthToken)
+                                .textFieldStyle(.roundedBorder)
+                                .font(.system(size: 12, design: .monospaced))
+                        }
+                        HStack(spacing: 8) {
+                            Button("Test Connection") {
+                                openClawTesting = true
+                                openClawTestResult = nil
+                                Task {
+                                    let token = settingsStore.openClawAuthToken.isEmpty ? nil : settingsStore.openClawAuthToken
+                                    let result = await openClawStore.testConnection(
+                                        baseURL: settingsStore.openClawGatewayURL,
+                                        token: token
+                                    )
+                                    openClawTestResult = result
+                                    openClawTesting = false
+                                }
+                            }
+                            .font(.system(size: 12, weight: .medium))
+                            .buttonStyle(.plain)
+                            .foregroundStyle(.blue)
+                            .disabled(openClawTesting)
+                            if openClawTesting {
+                                ProgressView().scaleEffect(0.5)
+                            }
+                        }
+                        if let result = openClawTestResult {
+                            Text(result.message)
+                                .font(.system(size: 11))
+                                .foregroundStyle(result.success ? .green : .red)
+                        }
+                        Text("Supports remote machines (e.g. 10.0.0.49:18789)")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.white.opacity(0.3))
                     }
                 }
             }

@@ -29,6 +29,8 @@ struct MainAppView: View {
                 switch selectedSection {
                 case .dashboard:
                     DashboardView()
+                case .openClaw:
+                    OpenClawSectionView()
                 case .display:
                     DisplaySectionView(initialMetrics: settingsStore.pinnedMetrics)
                 case .themes:
