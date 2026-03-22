@@ -8,11 +8,12 @@ export const refreshFrequency = 60000; // 60 seconds
 const PREFS_FILE = "~/.token-monitor-prefs.json";
 
 export const className = `
-  top: 20px;
-  right: 20px;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
   color: #e0e0e0;
   z-index: 1;
+  width: 100%;
+  height: 100%;
+  position: relative;
 `;
 
 // --- Helpers ---
@@ -64,11 +65,70 @@ function formatTokens(n) {
   return n.toString();
 }
 
+// --- Drag state (module-level for smooth DOM manipulation) ---
+
+let _dragState = null;
+let _dispatch = null;
+let _currentPrefs = {};
+
+function persistPrefs(prefs) {
+  try {
+    const run = require("child_process").execSync;
+    run(`echo '${JSON.stringify(prefs)}' > $HOME/.token-monitor-prefs.json`);
+  } catch (e) {}
+}
+
+function handleDocMouseMove(e) {
+  if (!_dragState) return;
+  if (_dragState.type === "move") {
+    const dx = e.clientX - _dragState.startX;
+    const dy = e.clientY - _dragState.startY;
+    _dragState.element.style.left = (_dragState.startLeft + dx) + "px";
+    _dragState.element.style.top = (_dragState.startTop + dy) + "px";
+  } else if (_dragState.type === "resize") {
+    const dx = e.clientX - _dragState.startX;
+    const dy = e.clientY - _dragState.startY;
+    const newW = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, _dragState.startWidth + dx));
+    const newH = Math.max(150, _dragState.startHeight + dy);
+    _dragState.element.style.width = newW + "px";
+    _dragState.element.style.height = newH + "px";
+  }
+}
+
+function handleDocMouseUp(e) {
+  if (!_dragState) return;
+  const el = _dragState.element;
+  if (_dragState.type === "move") {
+    const left = parseInt(el.style.left) || 0;
+    const top = parseInt(el.style.top) || 0;
+    if (_dispatch) {
+      _dispatch({ type: "SET_POSITION", top, left });
+    }
+    const prefs = { ..._currentPrefs, top, left };
+    _currentPrefs = prefs;
+    persistPrefs(prefs);
+  } else if (_dragState.type === "resize") {
+    const width = parseInt(el.style.width) || DEFAULT_WIDTH;
+    const height = parseInt(el.style.height) || null;
+    if (_dispatch) {
+      _dispatch({ type: "SET_WIDTH", width });
+      if (height) _dispatch({ type: "SET_HEIGHT", height });
+    }
+    const prefs = { ..._currentPrefs, width, height };
+    _currentPrefs = prefs;
+    persistPrefs(prefs);
+  }
+  _dragState = null;
+  document.removeEventListener("mousemove", handleDocMouseMove);
+  document.removeEventListener("mouseup", handleDocMouseUp);
+}
+
 // --- Dynamic styles factory ---
 
 function getStyles(fontSize, width) {
   return {
     container: {
+      position: "absolute",
       background: "rgba(30, 30, 30, 0.88)",
       backdropFilter: "blur(20px)",
       WebkitBackdropFilter: "blur(20px)",
@@ -77,11 +137,22 @@ function getStyles(fontSize, width) {
       padding: "14px 16px",
       boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
       width: width,
-      minWidth: 260,
-      maxWidth: 1400,
-      resize: "horizontal",
+      minWidth: MIN_WIDTH,
+      maxWidth: MAX_WIDTH,
       overflow: "auto",
       fontSize: fontSize,
+      cursor: "grab",
+      userSelect: "none",
+      WebkitUserSelect: "none",
+    },
+    resizeHandle: {
+      position: "absolute",
+      bottom: 0,
+      right: 0,
+      width: 16,
+      height: 16,
+      cursor: "nwse-resize",
+      zIndex: 10,
     },
     header: {
       display: "flex",
@@ -405,7 +476,7 @@ const MIN_FONT_SIZE = 9;
 const MAX_FONT_SIZE = 48;
 const MIN_WIDTH = 260;
 const MAX_WIDTH = 1400;
-const WIDTH_STEP = 40;
+const MIN_HEIGHT = 150;
 
 export const initialState = {
   data: null,
@@ -413,6 +484,9 @@ export const initialState = {
   localRange: "today",
   fontSize: DEFAULT_FONT_SIZE,
   width: DEFAULT_WIDTH,
+  height: null,
+  top: null,
+  left: null,
   prefsLoaded: false,
 };
 
@@ -425,6 +499,9 @@ export const updateState = (event, prevState) => {
       if (!prevState.prefsLoaded && data.prefs) {
         if (data.prefs.fontSize) next.fontSize = data.prefs.fontSize;
         if (data.prefs.width) next.width = data.prefs.width;
+        if (data.prefs.height) next.height = data.prefs.height;
+        if (data.prefs.top != null) next.top = data.prefs.top;
+        if (data.prefs.left != null) next.left = data.prefs.left;
         next.prefsLoaded = true;
       }
       return next;
@@ -444,57 +521,109 @@ export const updateState = (event, prevState) => {
   if (event.type === "SET_WIDTH") {
     return { ...prevState, width: event.width };
   }
+  if (event.type === "SET_HEIGHT") {
+    return { ...prevState, height: event.height };
+  }
+  if (event.type === "SET_POSITION") {
+    return { ...prevState, top: event.top, left: event.left };
+  }
   return prevState;
 };
 
-export const render = ({ data, apiRange, localRange, fontSize, width }, dispatch) => {
+export const render = ({ data, apiRange, localRange, fontSize, width, height, top, left }, dispatch) => {
   const fs = fontSize || DEFAULT_FONT_SIZE;
   const w = width || DEFAULT_WIDTH;
   const s = getStyles(fs, w);
 
-  const persistPrefs = (prefs) => {
-    try {
-      const run = require("child_process").execSync;
-      run(`echo '${JSON.stringify(prefs)}' > $HOME/.token-monitor-prefs.json`);
-    } catch (e) {}
-  };
+  // Compute default position (top-right corner with 20px margin)
+  const currentTop = top != null ? top : 20;
+  const currentLeft = left != null ? left : (typeof window !== "undefined" ? window.innerWidth - w - 20 : 20);
+
+  // Update module-level refs for drag handlers
+  _dispatch = dispatch;
+  _currentPrefs = { fontSize: fs, width: w, height, top: currentTop, left: currentLeft };
 
   const changeFontSize = (delta) => {
     const step = fs >= 18 ? 2 : 1;
     const next = Math.min(MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, fs + delta * step));
     if (next !== fs) {
       dispatch({ type: "SET_FONT_SIZE", fontSize: next });
-      persistPrefs({ fontSize: next, width: w });
+      const prefs = { ..._currentPrefs, fontSize: next };
+      _currentPrefs = prefs;
+      persistPrefs(prefs);
     }
   };
 
-  const changeWidth = (delta) => {
-    const next = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, w + delta * WIDTH_STEP));
-    if (next !== w) {
-      dispatch({ type: "SET_WIDTH", width: next });
-      persistPrefs({ fontSize: fs, width: next });
-    }
+  const containerStyle = {
+    ...s.container,
+    top: currentTop,
+    left: currentLeft,
+  };
+  if (height) {
+    containerStyle.height = height;
+  }
+
+  const onContainerMouseDown = (e) => {
+    // Don't drag when clicking interactive elements
+    if (e.target.closest("button") || e.target.closest("[data-tab]") || e.target.dataset.resize) return;
+    const el = e.currentTarget;
+    _dragState = {
+      type: "move",
+      startX: e.clientX,
+      startY: e.clientY,
+      startTop: parseInt(el.style.top) || currentTop,
+      startLeft: parseInt(el.style.left) || currentLeft,
+      element: el,
+    };
+    el.style.cursor = "grabbing";
+    e.preventDefault();
+    document.addEventListener("mousemove", handleDocMouseMove);
+    document.addEventListener("mouseup", function onUp(e) {
+      document.removeEventListener("mouseup", onUp);
+      if (_dragState && _dragState.element) {
+        _dragState.element.style.cursor = "grab";
+      }
+      handleDocMouseUp(e);
+    });
+  };
+
+  const onResizeMouseDown = (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const container = e.target.parentElement;
+    const rect = container.getBoundingClientRect();
+    _dragState = {
+      type: "resize",
+      startX: e.clientX,
+      startY: e.clientY,
+      startWidth: rect.width,
+      startHeight: rect.height,
+      element: container,
+    };
+    document.addEventListener("mousemove", handleDocMouseMove);
+    document.addEventListener("mouseup", function onUp(e) {
+      document.removeEventListener("mouseup", onUp);
+      handleDocMouseUp(e);
+    });
   };
 
   if (!data) {
     return (
-      <div style={s.container}>
+      <div style={containerStyle} onMouseDown={onContainerMouseDown}>
         <div style={s.header}>
           <span style={s.title}>Token Monitor</span>
         </div>
         <div style={s.errorText}>Loading…</div>
+        <div data-resize="true" style={s.resizeHandle} onMouseDown={onResizeMouseDown} />
       </div>
     );
   }
 
   return (
-    <div style={s.container}>
+    <div style={containerStyle} onMouseDown={onContainerMouseDown}>
       <div style={s.header}>
         <span style={s.title}>Token Monitor</span>
         <div style={s.headerRight}>
-          <button style={s.sizeBtn} onClick={() => changeWidth(-1)} title="Decrease width">◀</button>
-          <button style={s.sizeBtn} onClick={() => changeWidth(1)} title="Increase width">▶</button>
-          <span style={{ ...s.lastUpdated, margin: "0 4px", opacity: 0.4 }}>│</span>
           <button style={s.sizeBtn} onClick={() => changeFontSize(-1)} title="Decrease font size">−</button>
           <span style={{ ...s.lastUpdated, minWidth: 18, textAlign: "center" }}>{fs}</span>
           <button style={s.sizeBtn} onClick={() => changeFontSize(1)} title="Increase font size">+</button>
@@ -525,6 +654,8 @@ export const render = ({ data, apiRange, localRange, fontSize, width }, dispatch
         onRangeChange={(r) => dispatch({ type: "SET_LOCAL_RANGE", range: r })}
         s={s}
       />
+
+      <div data-resize="true" style={s.resizeHandle} onMouseDown={onResizeMouseDown} />
     </div>
   );
 };
